@@ -1,23 +1,9 @@
 #!/bin/sh
-# Podman wrapper script to enforce image allowlist
-# Only allows Ubuntu LTS (Long Term Support) images
+# Podman wrapper script to enforce Gitea registry-only image policy
+# Only allows images from docker.gitea.com
 
-# Define allowed Ubuntu LTS images
-# Updated as of 2025: 24.04 (latest LTS), 22.04, 20.04
-ALLOWED_IMAGES="
-docker\.io/library/ubuntu:24\.04
-docker\.io/library/ubuntu:22\.04
-docker\.io/library/ubuntu:20\.04
-docker\.io/ubuntu:24\.04
-docker\.io/ubuntu:22\.04
-docker\.io/ubuntu:20\.04
-ubuntu:24\.04
-ubuntu:22\.04
-ubuntu:20\.04
-docker\.io/library/ubuntu:latest
-docker\.io/ubuntu:latest
-ubuntu:latest
-"
+# Define allowed image pattern - Gitea registry only
+ALLOWED_PATTERN="^docker\.gitea\.com/"
 
 # Function to check if image is allowed
 check_image_allowed() {
@@ -28,23 +14,31 @@ check_image_allowed() {
         return 0
     fi
     
-    # Check against allowlist
-    for pattern in $ALLOWED_IMAGES; do
-        if echo "$image" | grep -qE "^${pattern}$"; then
-            return 0
-        fi
-    done
+    # Check if image is from Gitea registry
+    if echo "$image" | grep -qE "$ALLOWED_PATTERN"; then
+        return 0
+    fi
     
     # Image not allowed
-    echo "❌ ERROR: Image '$image' is NOT allowed!" >&2
     echo "" >&2
-    echo "Only Ubuntu LTS images are permitted:" >&2
-    echo "  ✅ ubuntu:24.04 (Noble Numbat - Latest LTS)" >&2
-    echo "  ✅ ubuntu:22.04 (Jammy Jellyfish)" >&2
-    echo "  ✅ ubuntu:20.04 (Focal Fossa)" >&2
-    echo "  ✅ ubuntu:latest (alias for latest LTS)" >&2
+    echo "❌ ERROR: Image '$image' is NOT from an allowed registry!" >&2
     echo "" >&2
-    echo "Blocked image: $image" >&2
+    echo "Only Gitea official registry images are permitted:" >&2
+    echo "  ✅ docker.gitea.com/gitea/runner-images:ubuntu-latest" >&2
+    echo "  ✅ docker.gitea.com/gitea/runner-images:ubuntu-22.04" >&2
+    echo "  ✅ docker.gitea.com/gitea/runner-images:ubuntu-20.04" >&2
+    echo "  ✅ docker.gitea.com/your-org/your-custom-image:tag" >&2
+    echo "" >&2
+    echo "Blocked registries:" >&2
+    echo "  ❌ docker.io (Docker Hub)" >&2
+    echo "  ❌ ghcr.io (GitHub Container Registry)" >&2
+    echo "  ❌ quay.io (Red Hat Quay)" >&2
+    echo "  ❌ gcr.io (Google Container Registry)" >&2
+    echo "  ❌ ubuntu:22.04 (defaults to Docker Hub)" >&2
+    echo "  ❌ node:20-alpine (defaults to Docker Hub)" >&2
+    echo "" >&2
+    echo "Attempted image: $image" >&2
+    echo "" >&2
     return 1
 }
 

@@ -205,8 +205,85 @@ podman exec act_runner podman info
 To run jobs with specific labels, set them during registration:
 
 ```bash
--e GITEA_RUNNER_LABELS="linux-amd64:docker://node:20-alpine,custom-label:docker://custom-image"
+-e GITEA_RUNNER_LABELS="ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
 ```
+
+### Understanding Runner Labels vs Images
+
+**Important**: The image in `GITEA_RUNNER_LABELS` is a **default**, not a restriction.
+
+```bash
+# This registration:
+-e GITEA_RUNNER_LABELS="ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
+
+# Means:
+# - Label: "ubuntu-latest" (matches workflows with runs-on: ubuntu-latest)
+# - Default image: docker.gitea.com/runner-images:ubuntu-latest (used if workflow doesn't specify container)
+```
+
+**About Gitea's Runner Images:**
+
+- `docker.gitea.com/runner-images:ubuntu-latest` is **NOT** Docker Hub's official Ubuntu
+- It's **Gitea's pre-built image** with CI/CD tools (similar to GitHub Actions runners)
+- Includes: Git, Node.js, Python, Docker, common build tools
+- Source: https://gitea.com/gitea/runner-images
+
+**Registry Restriction - IMPORTANT:**
+
+This runner is configured to **ONLY accept images from Gitea's official registry** (`docker.gitea.com`).
+
+```yaml
+# ✅ ALLOWED - Gitea registry images
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # No container specified - uses label default
+    steps:
+      - run: echo "Using Gitea's runner image"
+
+  deploy:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.gitea.com/gitea/runner-images:ubuntu-22.04
+    steps:
+      - run: npm install
+
+# ❌ BLOCKED - Docker Hub and other registries
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04  # ❌ FAILS
+    # Error: Image 'docker.io/library/ubuntu:22.04' is NOT from an allowed registry!
+
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: node:20-alpine  # ❌ FAILS
+    # Error: Image 'docker.io/library/node:20-alpine' is NOT from an allowed registry!
+
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/owner/repo:latest  # ❌ FAILS
+    # Error: Image 'ghcr.io/owner/repo:latest' is NOT from an allowed registry!
+```
+
+**Why?** 
+
+- Docker Hub (docker.io) allows **anyone** to upload images without verification
+- Malicious actors can create images with backdoors, cryptominers, or exploits
+- By restricting to Gitea's official registry, only vetted images are used
+- This prevents workflows from pulling and executing untrusted code
+
+**Available Gitea Runner Images:**
+
+- `docker.gitea.com/gitea/runner-images:ubuntu-latest`
+- `docker.gitea.com/gitea/runner-images:ubuntu-22.04`
+- `docker.gitea.com/gitea/runner-images:ubuntu-20.04`
+- See full list: https://gitea.com/gitea/runner-images
+
+**Security Note**: Registry restriction is enforced by [`policy.json`](policy.json) and [`podman-wrapper.sh`](podman-wrapper.sh) at the container runtime level. Even if a workflow requests a different image, it will be blocked before execution.
 
 ### Resource Limits
 

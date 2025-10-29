@@ -4,54 +4,66 @@ This act_runner setup now includes the following security measures:
 
 ## Implemented Security Features
 
-### ✅ Point 3: Image Allowlisting
-- **File**: `policy.json`
-- **What it does**: Restricts container image pulls to trusted registries only
-- **Allowed registries**:
-  - docker.io (Docker Hub)
-  - quay.io
-  - ghcr.io (GitHub Container Registry)
-  - gcr.io (Google Container Registry)
-  - docker.gitea.com (Gitea official images)
-- **All other registries**: REJECTED by default
+### ✅ Registry Restriction - Gitea Only (policy.json + podman-wrapper.sh)
+
+**Most Important Security Feature**
+
+**Files**: `policy.json`, `podman-wrapper.sh`
+
+**What it does**: Restricts container image pulls to Gitea's official registry ONLY
+
+**Allowed registries**:
+  - ✅ docker.gitea.com (Gitea official registry)
+
+**Blocked registries (ALL others)**:
+  - ❌ docker.io (Docker Hub - public, anyone can upload)
+  - ❌ ghcr.io (GitHub Container Registry)
+  - ❌ quay.io (Red Hat Quay)
+  - ❌ gcr.io (Google Container Registry)
+  - ❌ Any other registry
+
+**Why this matters**: Docker Hub allows anyone to upload images. Malicious actors could create images with backdoors, cryptominers, or exploits. By restricting to Gitea's registry, only vetted official images can be used.
+
+**Example allowed images**:
+  - ✅ `docker.gitea.com/gitea/runner-images:ubuntu-latest`
+  - ✅ `docker.gitea.com/gitea/runner-images:ubuntu-22.04`
+  - ✅ `docker.gitea.com/gitea/runner-images:ubuntu-20.04`
+  - ✅ `docker.gitea.com/your-org/your-custom-image:v1.0`
+
+**Example blocked images**:
+  - ❌ `ubuntu:22.04` (defaults to docker.io/library/ubuntu:22.04)
+  - ❌ `node:20-alpine` (defaults to docker.io/library/node:20-alpine)
+  - ❌ `ghcr.io/owner/repo:latest`
+  - ❌ `malicious-user/cryptominer:latest`
 
 ### ✅ Point 4: Podman Image Trust Policy
 - **File**: `policy.json` (copied to `/home/runner/.config/containers/policy.json`)
 - **What it does**: Enforces registry restrictions at the Podman level
+- **Configuration**: Only `docker.gitea.com` is whitelisted, all others rejected
 - **Effect**: Any attempt to pull from unlisted registries will fail
 
-### ✅ Point 5: Network Isolation
-- **File**: `entrypoint.sh`
-- **What it does**: Creates an internal-only network named `restricted-net`
-- **Effect**: Job containers CANNOT access the internet (prevents data exfiltration)
-- **Configuration**: `config.yaml` sets `network: "restricted-net"`
+### ✅ Point 5: Network Access (Unrestricted)
 
 ### ✅ Point 8: Disable Privileged Operations
 - **File**: `config.yaml`
 - **Security options applied**:
   - `--security-opt=no-new-privileges`: Prevents privilege escalation
   - `--cap-drop=ALL`: Removes all Linux capabilities
-  - `--read-only`: Root filesystem is immutable
-  - `--tmpfs /tmp:rw,noexec,nosuid`: Writable /tmp but cannot execute binaries
+  - `--security-opt seccomp=/home/runner/.config/seccomp-profile.json`: Syscall filtering
 
-### ✅ Point 10: Registry Mirror Configuration
+### ✅ Point 10: Registry Configuration
 - **File**: `containers.conf`
-- **What it does**: Provides infrastructure for using a private registry mirror
-- **Status**: Template provided (commented out by default)
-- **To enable**: Uncomment and configure your mirror URL
+- **What it does**: Configures Podman registry settings
+- **Current setting**: Search list includes only `docker.gitea.com`
+- **Status**: Configured for Gitea-only access
 
-### ✅ Recommended Security Setup
-- **Files**: `config.yaml` and `config.secure.yaml`
-- **Comprehensive hardening**:
-  - Memory limit: 2GB (`-m 2g`)
-  - CPU limit: 2 cores (`--cpus 2`)
-  - Process limit: 100 processes (`--pids-limit 100`)
-  - No volume mounts allowed (`valid_volumes: []`)
-  - Read-only root filesystem
-  - No new privileges allowed
-  - All capabilities dropped
+### ✅ Additional Security: Seccomp Profile
+- **File**: `seccomp-profile.json`
+- **What it does**: Blocks dangerous system calls that could be used for container escape
+- **Blocked syscalls**: mount, umount, ptrace, reboot, kexec_load, init_module, delete_module, and more
+- **Applied to**: Inner job containers through config.yaml
 
-## Files Modified/Created
+## Security Configuration Summary
 
 1. ✅ `policy.json` - NEW: Registry allowlist policy
 2. ✅ `Dockerfile` - UPDATED: Includes policy.json
@@ -65,43 +77,59 @@ This act_runner setup now includes the following security measures:
 ### Before:
 - ❌ Any registry allowed
 - ❌ Full internet access
-- ❌ No resource limits
+- ❌ No syscall filtering
 - ❌ All capabilities enabled
-- ❌ Writable filesystem
 
 ### After:
-- ✅ Only trusted registries allowed
-- ✅ No internet access (internal network only)
-- ✅ Strict resource limits (2GB RAM, 2 CPUs, 100 processes)
+- ✅ **Only Gitea registry allowed** (docker.gitea.com)
+- ✅ Full internet access (per user requirement)
+- ✅ Seccomp syscall filtering active
 - ✅ All capabilities dropped
-- ✅ Read-only filesystem (except /tmp)
 - ✅ No privilege escalation possible
 - ✅ No volume mounts allowed
+- ✅ Rootless double-isolation (outer + inner namespaces)
 
 ## Usage Notes
 
-### If jobs need internet access:
-You can disable network isolation by changing in `config.yaml`:
+### Using Gitea Runner Images
+
+To use workflows with this runner, specify Gitea registry images:
+
 ```yaml
-network: ""  # Instead of "restricted-net"
+# ✅ CORRECT - Uses Gitea's official runner image
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # No container specified - uses label default
+    steps:
+      - run: echo "Using docker.gitea.com/gitea/runner-images:ubuntu-latest"
+
+# ✅ CORRECT - Explicitly uses Gitea registry
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.gitea.com/gitea/runner-images:ubuntu-22.04
+    steps:
+      - run: npm install
+
+# ❌ WRONG - Docker Hub blocked
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04  # FAILS - not from docker.gitea.com
 ```
 
-### If jobs need volumes:
+### If Jobs Need Volumes
+
 You can allow specific volumes in `config.yaml`:
 ```yaml
 valid_volumes:
   - "/path/to/allowed/volume"
 ```
 
-### If jobs need custom registries:
-Edit `policy.json` to add your registry:
-```json
-"your-registry.com": [
-  {
-    "type": "insecureAcceptAnything"
-  }
-]
-```
+**Warning**: Allowing volumes reduces security. Only allow if absolutely necessary.
 
 ## Rebuild Required
 
