@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  act_runner:
+    build: .
+    container_name: act_runner
+    restart: always
+    security_opt:
+      - label=disable
+    devices:
+      - /dev/fuse
+    environment:
+      # Replace these with your actual values
+      - GITEA_INSTANCE_URL=https://your-gitea-instance.com
+      - GITEA_RUNNER_REGISTRATION_TOKEN=your_registration_token_here
+      - GITEA_RUNNER_NAME=my-podman-runner
+      - GITEA_RUNNER_LABELS=ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest
+    volumes:
+      - act_runner_data:/home/runner/data:Z
+      - act_runner_containers:/home/runner/.local/share/containers:Z
+
+volumes:
+  act_runner_data:
+  act_runner_containers:
