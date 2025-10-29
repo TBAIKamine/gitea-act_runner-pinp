@@ -25,6 +25,7 @@ RUN adduser -D -u 1000 runner \
 
 # Create necessary directories
 RUN mkdir -p /home/runner/.config/act_runner \
+    && mkdir -p /home/runner/.config/containers \
     && mkdir -p /home/runner/.local/share/containers \
     && mkdir -p /home/runner/data \
     && chown -R runner:runner /home/runner
@@ -32,6 +33,7 @@ RUN mkdir -p /home/runner/.config/act_runner \
 # Configure Podman for rootless operation
 COPY containers.conf /etc/containers/containers.conf
 COPY storage.conf /etc/containers/storage.conf
+COPY policy.json /home/runner/.config/containers/policy.json
 
 # Set up Podman for the runner user
 USER runner
@@ -40,12 +42,19 @@ WORKDIR /home/runner
 # Initialize Podman storage
 RUN podman info > /dev/null 2>&1 || true
 
+# Install podman wrapper script for image allowlisting
+USER root
+RUN mv /usr/bin/podman /usr/bin/podman.real
+COPY podman-wrapper.sh /usr/bin/podman
+RUN chmod +x /usr/bin/podman
+
 # Copy configuration and entrypoint
 USER root
 COPY config.yaml /home/runner/.config/act_runner/config.yaml
+COPY seccomp-profile.json /home/runner/.config/seccomp-profile.json
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
-    && chown runner:runner /home/runner/.config/act_runner/config.yaml
+    && chown -R runner:runner /home/runner/.config
 
 USER runner
 

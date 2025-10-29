@@ -14,8 +14,8 @@ podman run -d \
   -e GITEA_RUNNER_REGISTRATION_TOKEN="your_registration_token_here" \
   -e GITEA_RUNNER_NAME="my-podman-runner" \
   -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest" \
-  -v act_runner_data:/home/runner/data:Z \
-  -v act_runner_containers:/home/runner/.local/share/containers:Z \
+  -v ./data:/home/runner/data:Z \
+  -v ./containers:/home/runner/.local/share/containers:Z \
   act_runner:latest
 
 echo "act_runner container started with --restart=always policy"

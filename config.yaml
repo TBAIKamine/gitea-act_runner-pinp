@@ -17,12 +17,15 @@ cache:
   port: 0
 
 container:
+  # Network configuration - empty means default
   network: ""
+  # Never run in privileged mode
   privileged: false
-  options: ""
+  # Security options with seccomp profile
+  options: "--security-opt seccomp=/home/runner/.config/seccomp-profile.json --security-opt=no-new-privileges --cap-drop=ALL"
   workdir_parent: ""
-  valid_volumes:
-    - '**'
+  # Restrict volume mounts - empty list means no volumes allowed
+  valid_volumes: []
   # Use Podman instead of Docker
   docker_host: "unix:///run/user/1000/podman/podman.sock"
   force_pull: false

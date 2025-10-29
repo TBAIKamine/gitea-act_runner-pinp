@@ -16,9 +16,5 @@ services:
       - GITEA_RUNNER_NAME=my-podman-runner
       - GITEA_RUNNER_LABELS=ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest
     volumes:
-      - act_runner_data:/home/runner/data:Z
-      - act_runner_containers:/home/runner/.local/share/containers:Z
-
-volumes:
-  act_runner_data:
-  act_runner_containers:
+      - ./data:/home/runner/data:Z
+      - ./containers:/home/runner/.local/share/containers:Z

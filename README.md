@@ -53,8 +53,8 @@ podman run -d \
   -e GITEA_RUNNER_REGISTRATION_TOKEN="your_token_here" \
   -e GITEA_RUNNER_NAME="my-podman-runner" \
   -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest" \
-  -v act_runner_data:/home/runner/data:Z \
-  -v act_runner_containers:/home/runner/.local/share/containers:Z \
+  -v ./data:/home/runner/data:Z \
+  -v ./containers:/home/runner/.local/share/containers:Z \
   act_runner:latest
 ```
 
@@ -69,7 +69,7 @@ podman run -d \
 
 3. Run with compose:
    ```bash
-   podman-compose up -d
+   podman compose up -d
    ```
 
 ## Environment Variables
@@ -150,14 +150,14 @@ podman restart act_runner
 
 ## Volumes
 
-Two persistent volumes are created:
+Two directories are mounted from the host:
 
-1. **act_runner_data**: Stores runner registration and cache data
-   - Location: `/home/runner/data`
+1. **./data**: Stores runner registration and cache data
+   - Mounted to: `/home/runner/data`
    - Contains: `.runner` file, cache directory
 
-2. **act_runner_containers**: Stores Podman images and containers
-   - Location: `/home/runner/.local/share/containers`
+2. **./containers**: Stores Podman images and containers
+   - Mounted to: `/home/runner/.local/share/containers`
    - Contains: Image layers, container storage
 
 ## Security Considerations
@@ -236,7 +236,7 @@ To use a custom config file, mount it:
 - `containers.conf` - Podman container runtime configuration
 - `storage.conf` - Podman storage configuration for rootless mode
 - `run.sh` - Helper script to run the container
-- `docker-compose.yml` - Compose file for easy deployment
+- `compose.yaml` - Compose file for easy deployment
 
 ## References
 

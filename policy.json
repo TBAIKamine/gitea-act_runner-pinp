@@ -1,0 +1,32 @@
+{
+  "default": [{"type": "reject"}],
+  "transports": {
+    "docker": {
+      "docker.io": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ],
+      "quay.io": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ],
+      "ghcr.io": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ],
+      "gcr.io": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ],
+      "docker.gitea.com": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ]
+    }
+  }
+}
